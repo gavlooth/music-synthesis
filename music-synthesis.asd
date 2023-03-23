@@ -6,7 +6,7 @@
   :license  "Specify license here"
   :version "0.0.1"
   :serial t
-  :depends-on (#:trivia #:iterate #:uiop #:cl-collider #:cl-patterns)
+  :depends-on (#:trivia #:iterate #:uiop #:cl-collider #:cl-patterns #:serapeum #:alexandria)
   :components ((:module "src"
                 :components
                  ((:file "package")
