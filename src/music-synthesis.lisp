@@ -3,6 +3,7 @@
 ;(ql:quickload :music-synthesis)
 ; (print sc:*sc-synth-program*)
 (setf sc:*s* (sc:make-external-server "localhost" :port 48800))
+
 (sc:server-boot sc:*s*)
 
 (sc:jack-connect)
@@ -11,11 +12,20 @@
 
 (defvar *sample-files*  "/usr/share/lmms/samples")
 
+(defvar *bongo-sequence*    (map 'list #'(lambda  (x)(sc:buffer-read (format nil "/home/heefoo/lmms/raw/bongos/~a.wav" x))) (alexandria:iota 8 :start 1)))
+
 (defvar *wav-bass* (sc:buffer-read "/home/heefoo/lmms/raw/bass01.wav"))
 
 (defvar *guira-file* (sc:buffer-read "/home/heefoo/lmms/raw/guira_short.wav"))
 
-; (sc:synth 'sample :buffer *guira-file*)
+(defvar *dance-monkey* (sc:buffer-cue-soundfile  "/home/heefoo/lmms/raw/Dance Monkey - Tones And I (Cover by Alexander Stewart) (152kbit_Opus).wav"))
+
+(setf *dance-monkey* (sc:buffer-cue-soundfile  "/home/heefoo/lmms/raw/Dance Monkey - Tones And I (Cover by Alexander Stewart) (152kbit_Opus).wav"))
+
+(sc:defsynth dancing-monkey  ()
+    (sc:out.ar 0 (sc:disk-in.ar 2 *dance-monkey*)))
+
+
 (sc:defsynth drum ((freq 3000))
   (let* ((env (sc:env-gen.ar (sc:perc 0.001 0.1) :act :free))
          (sig (sc:lpf.ar (sc:white-noise.ar) (* freq env))))
@@ -41,59 +51,86 @@
 
 (defparameter bass-list (map 'list #'(lambda (x) (gethash x music-notes))  '(:A3 :A3 :E4 :E4)))
 
-(defun bachata-loop (beat)
-   (loop for x in  bass-list
-         for y in '(0 1.5 2 3 4 5.5 6 7)
-         for z in '(0 1 2 3)
-      do (sc:at-beat (+ beat y) (sc:synth 'sample-note
-                                          :buffer *wav-bass*
-                                          :freq x
-                                          :amp 1))
-         (sc:at-beat (+ beat z) (sc:synth 'sample-note
-                                          :buffer *guira-file*
-                                          :freq 440
-                                          :amp 0.4))
-         (sc:at-beat (+ beat z 0.5) (sc:synth 'sample-note
-                                              :buffer *guira-file*
-                                              :freq 440
-                                              :amp 0.4)))
-  (sc:clock-add (+ beat 4)  'bachata-loop (+ beat 4)))
-
-
-(defun bachata-loop-2 (beat)
-   (loop for x in  bass-list
-         for y in '(0 1.5 2 3 4 5.5 6 7)
-         for z in '(0 1 2 3)
-      do (sc:at-beat (+ beat y) (sc:synth 'sample-note
-                                          :buffer *wav-bass*
-                                          :freq x
-                                          :amp 1))
-         (sc:at-beat (+ beat z) (sc:synth 'sample-note
-                                          :buffer *guira-file*
-                                          :freq 440
-                                          :amp 0.4))
-         (sc:at-beat (+ beat z 0.5) (sc:synth 'sample-note
-                                              :buffer *guira-file*
-                                              :freq 440
-                                              :amp 0.4)))
-  (bachata-loop-2 (+ beat 4)))
-
-(sc:CLOCK-BPM 120)
-
-; (defvar *player*)
-; (setf  *player* (sc:play (sc:synth 'sample-bass :buffer *guira-file* :freq 587.33 :amp 3)))
+; (defun bachata-loop (beat)
+;    (loop for x in  bass-list
+;          for y in '(0 1.5 2 3 4 5.5 6 7)
+;          for z in '(0 1 2 3)
+;       do (sc:at-beat (+ beat y) (sc:synth 'sample-note
+;                                           :buffer *wav-bass*
+;                                           :freq x
+;                                           :amp 1))
+;          (sc:at-beat (+ beat z) (sc:synth 'sample-note
+;                                           :buffer *guira-file*
+;                                           :freq 440
+;                                           :amp 0.4))
+;          (sc:at-beat (+ beat z 0.5) (sc:synth 'sample-note
+;                                               :buffer *guira-file*
+;                                               :freq 440
+;                                               :amp 0.4)))
+;   (sc:clock-add (+ beat 4)  'bachata-loop (+ beat 4)))
 ;
+(defvar the-switch '(1))
+; (setf the-switch '())
+
+
+(defun bachata-loop (beat x)
+  (loop for x in  bass-list
+        for y in '(0 1.5 2 3)
+        for z in '(0 1 2 3)
+     do (sc:at-beat (+ beat y) (sc:synth 'sample-note
+                                         :buffer *wav-bass*
+                                         :freq x
+                                         :amp 0.4))
+        (sc:at-beat (+ beat z) (sc:synth 'sample-note
+                                         :buffer *guira-file*
+                                         :freq 440
+                                         :amp 0.4))
+        (sc:at-beat (+ beat z 0.5) (sc:synth 'sample-note
+                                             :buffer *guira-file*
+                                             :freq 440
+                                             :amp 0.4)))
+ (when (> x 0)
+  (sc:callback (+ beat 4)  #'bachata-loop (+ beat 4) (- x 1))))
+
+
+
+(defun play-bongos (beat)
+  (loop for i in (alexandria:iota 8)
+     do (sc:at-beat (+ i beat ) (sc:synth 'sample-note :buffer (nth i *bongo-sequence*) :amp 0.4))))
+
+
+;(play-bongos (sc:clock-quant  0))
+(sc:CLOCK-BPM 98)
+
+
+(defvar *player*)
+
+(setf  *player* (sc:play (sc:disk-in.ar 2  *dance-monkey*)))
+
+
+(setf  *player* (sc:play (sc:synth  'dancing-monkey)))
+
+(defun make-mix ()
+  (sc:at-beat (sc:clock-quant  4) (sc:play (sc:disk-in.ar 2  *dance-monkey*)))
+  (bachata-loop (sc:clock-quant  4) 8))
+
+
+;(make-mix)
+
 ;  (setf  *player* (sc:play (sc:synth 'sample :buffer *guira-file*))))
-; (sc:free *player*)
-;
-
+(defun reset! ()
+       (sc:free *player*)
+       (sc:stop)
+       (setf *dance-monkey* (sc:buffer-cue-soundfile  "/home/heefoo/lmms/raw/Dance Monkey - Tones And I (Cover by Alexander Stewart) (152kbit_Opus).wav")))
+; (reset!)
 ; (loop for x in '(:B4 :B4 :F5)
 ;        collect (gethash x music-notes))
 
 ; (sc:stop)
 
 
-;(bachata-loop-2 (sc:clock-quant  4))
+;(bachata-loop (sc:clock-quant  4) 4)
+;(bachata-loop-2 (sc:clock-quant  8))
 
 
 
@@ -130,6 +167,5 @@
 ;       (let ((next-time (+ times )))
 ;         (make-melody next-time (- n 1) offset)))))
 ; |#
-
 
 
