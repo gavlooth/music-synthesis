@@ -2,7 +2,6 @@
 (in-package #:music-synthesis)
 ;(ql:quickload :music-synthesis)
 ; (print sc:*sc-synth-program*)
-
 (setf sc:*s* (sc:make-external-server "localhost" :port 48800))
 (sc:server-boot sc:*s*)
 
@@ -23,7 +22,7 @@
     (sc:out.ar 0 (sc:pan2.ar sig 0 0.2))))
 
 
-(sc:defsynth sample-bass ((buffer 0) (freq 440) (start 0) (amp 0.5) (out 0))
+(sc:defsynth sample-note ((buffer 0) (freq 440) (start 0) (amp 0.5) (out 0))
   (let ((sig (sc:play-buf.ar 2 buffer (*  (/ freq 440) (sc:buf-rate-scale.ir buffer))
                              :start-pos (* start (sc:buf-frames.ir buffer))
                              :act :free)))
@@ -35,30 +34,49 @@
 (defun default-beat (times n)
   (when (> n 0)
     (sc:at-beat 10
-                (sc:synth 'sample-bass :buffer *wav-bass* :freq 587.33 :amp 5)
+                (sc:synth 'sample-note :buffer *wav-bass* :freq 587.33 :amp 5)
                 (default-beat (+ 1 times) (- n 1)))))
 
 (setf *synth-definition-mode* :load)
 
-(defparameter bass-list '(:A3 :A3 :E4 :E4))
+(defparameter bass-list (map 'list #'(lambda (x) (gethash x music-notes))  '(:A3 :A3 :E4 :E4)))
 
-(defun bass (beat)
+(defun bachata-loop (beat)
    (loop for x in  bass-list
-         for y in '(0 1.5 2 3)
+         for y in '(0 1.5 2 3 4 5.5 6 7)
          for z in '(0 1 2 3)
-      do (sc:at-beat (+ beat y) (sc:synth 'sample-bass
+      do (sc:at-beat (+ beat y) (sc:synth 'sample-note
                                           :buffer *wav-bass*
-                                          :freq (gethash x music-notes)
+                                          :freq x
                                           :amp 1))
-         (sc:at-beat (+ beat z) (sc:synth 'sample-bass
+         (sc:at-beat (+ beat z) (sc:synth 'sample-note
                                           :buffer *guira-file*
                                           :freq 440
                                           :amp 0.4))
-         (sc:at-beat (+ beat z 0.5) (sc:synth 'sample-bass
+         (sc:at-beat (+ beat z 0.5) (sc:synth 'sample-note
                                               :buffer *guira-file*
                                               :freq 440
                                               :amp 0.4)))
-  (sc:clock-add (+ beat 4)  'bass (+ beat 4)))
+  (sc:clock-add (+ beat 4)  'bachata-loop (+ beat 4)))
+
+
+(defun bachata-loop-2 (beat)
+   (loop for x in  bass-list
+         for y in '(0 1.5 2 3 4 5.5 6 7)
+         for z in '(0 1 2 3)
+      do (sc:at-beat (+ beat y) (sc:synth 'sample-note
+                                          :buffer *wav-bass*
+                                          :freq x
+                                          :amp 1))
+         (sc:at-beat (+ beat z) (sc:synth 'sample-note
+                                          :buffer *guira-file*
+                                          :freq 440
+                                          :amp 0.4))
+         (sc:at-beat (+ beat z 0.5) (sc:synth 'sample-note
+                                              :buffer *guira-file*
+                                              :freq 440
+                                              :amp 0.4)))
+  (bachata-loop-2 (+ beat 4)))
 
 (sc:CLOCK-BPM 120)
 
@@ -75,7 +93,7 @@
 ; (sc:stop)
 
 
-;(bass (sc:clock-quant  4))
+;(bachata-loop-2 (sc:clock-quant  4))
 
 
 
